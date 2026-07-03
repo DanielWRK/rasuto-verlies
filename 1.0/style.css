@@ -1,0 +1,131 @@
+body {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+    font-family: monospace;
+    text-align: center;
+    margin: 0;
+    padding: 0;
+}
+
+h1 {
+    color: #ff4d4d;
+    margin-top: 50px;
+}
+
+.seleccion-clases button {
+    display: block;
+    width: 300px;
+    margin: 15px auto;
+    padding: 15px;
+    background-color: #333;
+    color: white;
+    border: 2px solid #555;
+    cursor: pointer;
+    font-family: monospace;
+    font-size: 14px;
+    transition: 0.2s;
+}
+
+.seleccion-clases button:hover {
+    background-color: #555;
+    border-color: #ff4d4d;
+}
+
+#hud {
+    background-color: #111;
+    padding: 10px;
+    display: flex;
+    justify-content: space-around;
+    border-bottom: 2px solid #444;
+}
+
+#contenedor-mazmorra {
+    width: 400px;
+    height: 400px;
+    margin: 20px auto;
+    border: 2px dashed #444;
+}
+
+/* =========================================
+   ESTILOS FASE 2: TABLERO Y JUGADOR
+   ========================================= */
+
+#tablero {
+    display: grid;
+    /* Crea 8 columnas y 8 filas del mismo tamaño */
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    width: 100%;
+    height: 100%;
+    background-color: #222;
+    gap: 2px; /* Líneas divisorias entre cuadros */
+    padding: 2px;
+    box-sizing: border-box;
+}
+
+.celda {
+    background-color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.jugador {
+    width: 80%;
+    height: 80%;
+    border-radius: 50%; /* Lo convierte en un círculo */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 20px;
+}
+
+/* =========================================
+   ESTILOS FASE 3: ATAQUE Y COOLDOWN
+   ========================================= */
+
+/* Destello visual en la casilla atacada */
+.celda.ataque {
+    background-color: #ffb74d; /* Naranja brillante */
+    box-shadow: inset 0 0 10px #e65100;
+}
+
+/* Efecto visual en el HUD cuando el esquive está en cooldown */
+.cooldown-activo {
+    color: #ff4d4d;
+    opacity: 0.5;
+}
+
+/* =========================================
+   ESTILOS CORRECCIÓN: BARRA DASH Y FLECHA
+   ========================================= */
+
+#cooldown-hud { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.barra-fondo { width: 200px; height: 12px; background-color: #333; border: 2px solid #555; }
+#barra-dash { width: 100%; height: 100%; background-color: #4CAF50; } /* Verde por defecto */
+
+/* Estilos de la flecha del arquero */
+.celda.flecha-horizontal {
+    background-color: transparent;
+    box-shadow: inset 0px 10px 0px #222, inset 0px -10px 0px #222; /* Hace la línea delgada horizontal */
+    background-color: #ffeb3b; 
+}
+.celda.flecha-vertical {
+    background-color: transparent;
+    box-shadow: inset 10px 0px 0px #222, inset -10px 0px 0px #222; /* Hace la línea delgada vertical */
+    background-color: #ffeb3b; 
+}
+
+/* =========================================
+   ESTILOS FASE 4: ENTIDADES DEL MUNDO
+   ========================================= */
+.arbusto, .enemigo, .cofre {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}

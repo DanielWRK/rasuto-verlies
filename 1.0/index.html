@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Rasuto Verlies</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="pantalla-inicio" class="pantalla">
+        <h1>Rasuto Verlies</h1>
+        <p>La última mazmorra te espera. Elige tu destino:</p>
+        
+        <div class="seleccion-clases">
+            <button onclick="seleccionarClase('arquero')">🏹 Arquero (Rápido, Rango 2)</button>
+            <button onclick="seleccionarClase('espadachin')">🗡️ Espadachín (Equilibrado, Rango 1)</button>
+            <button onclick="seleccionarClase('peleador')">🥊 Peleador (Lento, Daño Alto, Rango 0.5)</button>
+        </div>
+    </div>
+
+    <div id="pantalla-juego" class="pantalla" style="display: none;">
+<div id="hud">
+            <div style="display: flex; gap: 20px;">
+                <div id="corazones">❤️❤️❤️</div>
+                <div id="estadisticas-texto">Cargando estadísticas...</div>
+            </div>
+            <div id="cooldown-hud">
+                <span style="font-size: 12px; font-weight: bold;">ESQUIVE (O):</span>
+                <div class="barra-fondo">
+                    <div id="barra-dash" class="barra-llena"></div>
+                </div>
+            </div>
+        </div>
+        </div>
+        
+        <div id="contenedor-mazmorra">
+            <p style="text-align:center; margin-top: 50px;">Clase validada localmente.<br>Esperando la Fase 2 para renderizar la mazmorra...</p>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
