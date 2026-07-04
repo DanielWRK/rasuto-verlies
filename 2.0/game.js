@@ -12,6 +12,93 @@ const btnJugar = document.getElementById('btn-jugar');
 const GRID_SIZE = 8;
 const CELL_SIZE = 100; // 800x800 dividido en 8x8 significa celdas de 100x100
 
+/* =========================================
+   SISTEMA DE ARMAS (DICCIONARIO GLOBAL)
+   ========================================= */
+const CONFIG_ARMAS = {
+    punios: {
+        nombre: 'Puños',
+        rango: 35,
+        daño: 1,
+        cooldownBase: 20,
+        velocidadAnimacion: 0.15,
+        tipoHitbox: 'recta', // Pega solo al frente
+        dibujar: (ctx, p, progreso) => {
+            let avance = progreso < 0.5 ? progreso * 2 : (1 - progreso) * 2; 
+            let alcanceGolpe = avance * CONFIG_ARMAS['punios'].rango;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x + Math.cos(p.anguloMirada) * alcanceGolpe, p.y + Math.sin(p.anguloMirada) * alcanceGolpe);
+            ctx.strokeStyle = '#ff9800'; 
+            ctx.lineWidth = 12; 
+            ctx.stroke();
+        }
+    },
+    espada: {
+        nombre: 'Espada de Bronce',
+        rango: 65,
+        daño: 1,
+        cooldownBase: 40,
+        velocidadAnimacion: 0.08, // Más lenta
+        tipoHitbox: 'abanico', // Pega en área
+        dibujar: (ctx, p, progreso) => {
+            let rango = CONFIG_ARMAS['espada'].rango;
+            let anguloInicio = p.anguloMirada - Math.PI / 3;
+            let anguloActual = anguloInicio + (Math.PI * 2 / 3) * progreso;
+            
+            // Área amarilla
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.arc(p.x, p.y, rango, anguloInicio, anguloActual);
+            ctx.lineTo(p.x, p.y);
+            ctx.fillStyle = 'rgba(255, 235, 59, 0.22)';
+            ctx.fill();
+            
+            // Borde brillante de la hoja
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p.x + Math.cos(anguloActual) * rango, p.y + Math.sin(anguloActual) * rango);
+            ctx.strokeStyle = '#fff59d';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+        }
+    },
+        arco: {
+        nombre: 'Arco de Caza',
+        rango: 400, // Sirve de referencia
+        daño: 1,
+        cooldownBase: 35,
+        velocidadAnimacion: 0.10,
+        tipoHitbox: 'proyectil',     // 👈 Define que no pega cuerpo a cuerpo
+        velocidadProyectil: 12,      // 👈 Qué tan rápido vuela la flecha
+        dibujar: (ctx, p, progreso) => {
+            // Dibujar un arco estilo Zelda
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.anguloMirada);
+            
+            // Madera del arco
+            ctx.beginPath();
+            ctx.arc(0, 0, 20, -Math.PI/2, Math.PI/2);
+            ctx.strokeStyle = '#8B4513';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            // Cuerda animada que se tensa
+            ctx.beginPath();
+            ctx.moveTo(0, -20);
+            let tension = progreso > 0 ? (progreso < 0.5 ? progreso * 20 : (1 - progreso) * 20) : 0;
+            ctx.lineTo(-tension, 0);
+            ctx.lineTo(0, 20);
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+    }
+};
+
 const gameState = {
     corriendo: false,
     teclas: { w: false, a: false, s: false, d: false },
@@ -46,13 +133,11 @@ const gameState = {
         escudoActivo: false,
         escudoRadioActual: 0,
         escudoRadioMax: 65,
-        armaActual: 'espada',
-        armasDesbloqueadas: ['espada'],
+        armaActual: 'punios',
         atacando: false,
         progresoAtaque: 0, 
+        proyectilesJugador: [], 
         ataqueCooldownTimer: 0,
-        ataqueCooldownTotal: 25, 
-        rangoAtaque: 65
     }
 };
 
@@ -116,17 +201,38 @@ document.addEventListener('mousedown', (e) => {
         const p = gameState.jugador;
     
     
+        // ATAQUE PRINCIPAL
+        // ATAQUE PRINCIPAL
         if (e.button === 0 && p.ataqueCooldownTimer === 0 && p.dashFramesActivos === 0 && !p.escudoActivo) {
+            let arma = CONFIG_ARMAS[p.armaActual];
+            
             p.atacando = true;
             p.progresoAtaque = 0;
-            p.ataqueCooldownTimer = Math.max(10, p.ataqueCooldownTotal - p.velocidadAtaqueItem);
-            gameState.enemigos.forEach(en => en.golpeadoEnEsteAtaque = false);
-        }
+            p.ataqueCooldownTimer = Math.max(10, arma.cooldownBase - p.velocidadAtaqueItem);
+            
+            // 🔥 NUEVO: Si es arma de rango, dispara la flecha al hacer clic
+            if (arma.tipoHitbox === 'proyectil') {
+                gameState.proyectilesJugador.push({
+                    x: p.x + Math.cos(p.anguloMirada) * p.radio, // Sale desde el borde del jugador
+                    y: p.y + Math.sin(p.anguloMirada) * p.radio,
+                    vx: Math.cos(p.anguloMirada) * arma.velocidadProyectil,
+                    vy: Math.sin(p.anguloMirada) * arma.velocidadProyectil,
+                    radio: 4,
+                    daño: arma.daño
+                });
+                } else {
+                    // Solo reiniciamos esto si es cuerpo a cuerpo
+                    gameState.enemigos.forEach(en => en.golpeadoEnEsteAtaque = false);
+                }
+            }
+
+
     
         if (e.button === 2 && p.tieneEscudo && p.stamina >= p.staminaMax && !p.escudoActivo && p.dashFramesActivos === 0 && !p.atacando) {
             p.stamina -= p.staminaMax; // Drena TODA la barra (100%)
             p.escudoActivo = true;
             p.escudoRadioActual = p.radio; 
+    }
 });
 
 document.addEventListener('keydown', (e) => {
@@ -168,6 +274,7 @@ function generarZona() {
     gameState.enemigos = [];
     gameState.cofres = [];
     gameState.proyectilesEnemigos = []; 
+    gameState.proyectilesJugador = [];
 
     for (let gY = 0; gY < GRID_SIZE; gY++) {
         // Ignorar por completo la primera fila superior para evitar choques con el HUD
@@ -228,6 +335,7 @@ function generarZona() {
 /* =========================================
    ACTUALIZACIÓN DE FÍSICAS Y REFUERZOS
    ========================================= */
+
 function actualizarMotor() {
     const p = gameState.jugador;
 
@@ -247,19 +355,17 @@ function actualizarMotor() {
     if (p.stamina > p.staminaMax) p.stamina = p.staminaMax;
 
     if (p.escudoActivo) {
-        p.escudoRadioActual += 3.5; // Velocidad de expansión de la onda
+        p.escudoRadioActual += 3.5; 
         
-        // Empujar con fuerza a todos los enemigos que entren en el radio de la onda
         gameState.enemigos.forEach(enemigo => {
             let dist = Math.hypot(enemigo.x - p.x, enemigo.y - p.y);
             if (dist <= p.escudoRadioActual + enemigo.radio) {
                 let anguloEnemigo = Math.atan2(enemigo.y - p.y, enemigo.x - p.x);
-                enemigo.pushbackFrames = 14; // Empuje prolongado
+                enemigo.pushbackFrames = 14; 
                 enemigo.anguloPushback = anguloEnemigo;
             }
         });
 
-        // Terminar la onda al llegar a su rango máximo
         if (p.escudoRadioActual >= p.escudoRadioMax) {
             p.escudoActivo = false;
         }
@@ -267,25 +373,60 @@ function actualizarMotor() {
 
     p.anguloMirada = Math.atan2(gameState.mouse.y - p.y, gameState.mouse.x - p.x);
 
-    // Control del abanico animado
-    let anguloActualEspada = 0;
+    // =========================================
+    // Control de Animaciones y Daño (CUERPO A CUERPO)
+    // =========================================
     if (p.atacando) {
-        p.progresoAtaque += 0.12; 
-        let anguloInicio = p.anguloMirada - Math.PI / 3;
-        anguloActualEspada = anguloInicio + (Math.PI * 2 / 3) * p.progresoAtaque;
+        let arma = CONFIG_ARMAS[p.armaActual]; 
+        
+        let velocidadAnimacionReal = arma.velocidadAnimacion + (p.velocidadAtaqueItem * 0.005);
+        p.progresoAtaque += velocidadAnimacionReal; 
+        
+        let anguloActualEspada = p.anguloMirada - Math.PI / 3 + (Math.PI * 2 / 3) * p.progresoAtaque;
 
         if (p.progresoAtaque >= 1) {
             p.atacando = false;
             p.progresoAtaque = 0;
         }
+
+        // Daño Melee
+        if (arma.tipoHitbox !== 'proyectil') { 
+            gameState.enemigos.forEach(enemigo => {
+                if (enemigo.golpeadoEnEsteAtaque) return; 
+                let dist = Math.hypot(enemigo.x - p.x, enemigo.y - p.y);
+                
+                if (dist <= arma.rango + enemigo.radio) {
+                    let anguloEnemigo = Math.atan2(enemigo.y - p.y, enemigo.x - p.x);
+                    let impactoExitoso = false;
+
+                    if (arma.tipoHitbox === 'abanico') {
+                        let difAngular = Math.atan2(Math.sin(anguloEnemigo - anguloActualEspada), Math.cos(anguloEnemigo - anguloActualEspada));
+                        if (Math.abs(difAngular) < 0.28) impactoExitoso = true;
+                    } 
+                    else if (arma.tipoHitbox === 'recta') {
+                        let difAngular = Math.atan2(Math.sin(anguloEnemigo - p.anguloMirada), Math.cos(anguloEnemigo - p.anguloMirada));
+                        if (Math.abs(difAngular) < 0.35) impactoExitoso = true;
+                    }
+
+                    if (impactoExitoso) {
+                        enemigo.hp -= arma.daño; 
+                        enemigo.golpeadoEnEsteAtaque = true; 
+                        enemigo.pushbackFrames = 5; 
+                        enemigo.anguloPushback = p.anguloMirada;
+                    }
+                }
+            });
+            gameState.enemigos = gameState.enemigos.filter(e => e.hp > 0);
+        }
     }
 
-    // Calcular posición final aplicando Modificadores de Desplazamiento
+    // =========================================
+    // Modificadores de Desplazamiento del Jugador
+    // =========================================
     let siguienteX = p.x;
     let siguienteY = p.y;
 
     if (p.pushbackFrames > 0) {
-        // REQUISITO: El jugador es empujado hacia atrás por el impacto enemigo
         siguienteX += Math.cos(p.anguloPushback) * 8;
         siguienteY += Math.sin(p.anguloPushback) * 8;
         p.pushbackFrames--;
@@ -308,14 +449,12 @@ function actualizarMotor() {
         siguienteY += dy * p.velocidad;
     }
 
-    // Límites del HUD y mapa
     const LIMITE_HUD_Y = 50; 
     if (siguienteX < p.radio) siguienteX = p.radio;
     if (siguienteX > canvas.width - p.radio) siguienteX = canvas.width - p.radio;
     if (siguienteY < LIMITE_HUD_Y + p.radio) siguienteY = LIMITE_HUD_Y + p.radio;
     if (siguienteY > canvas.height - p.radio) siguienteY = canvas.height - p.radio;
 
-    // Colisión jugador contra arbustos ajustados
     let chocaObstaculo = false;
     gameState.arbustos.forEach(arbusto => {
         if (Math.hypot(siguienteX - arbusto.x, siguienteY - arbusto.y) < p.radio + arbusto.radio) chocaObstaculo = true;
@@ -329,22 +468,23 @@ function actualizarMotor() {
     // Absorción de cofres
     gameState.cofres = gameState.cofres.filter(cofre => {
         if (Math.hypot(p.x - cofre.x, p.y - cofre.y) < p.radio + cofre.radio) {
-            abrirMenuCofre(); // Llama a la generación de cartas
-            return false; // Borra el cofre físico del suelo
+            abrirMenuCofre(); 
+            return false; 
         }
         return true;
     });
 
+    // =========================================
+    // Actualización de Enemigos
+    // =========================================
     if (gameState.debug.enemigosActivos) {
-        
         gameState.enemigos.forEach(enemigo => {
             let distAlJugador = Math.hypot(p.x - enemigo.x, p.y - enemigo.y);
             let movX = enemigo.x;
             let movY = enemigo.y;
 
-            // 🔥 NUEVO: Movimiento de empuje suave (Knockback) priorizado
             if (enemigo.pushbackFrames > 0) {
-                movX += Math.cos(enemigo.anguloPushback) * 6; // Se desliza 6px por frame
+                movX += Math.cos(enemigo.anguloPushback) * 6; 
                 movY += Math.sin(enemigo.anguloPushback) * 6;
                 enemigo.pushbackFrames--;
             } else if (enemigo.tipo === 'zombie') {
@@ -389,7 +529,6 @@ function actualizarMotor() {
                 let enemigoChocaArbusto = gameState.arbustos.some(a => Math.hypot(movX - a.x, movY - a.y) < enemigo.radio + a.radio);
                 let fueraDeMargen = (movX < enemigo.radio || movX > canvas.width - enemigo.radio || movY < LIMITE_HUD_Y + enemigo.radio || movY > canvas.height - enemigo.radio);
                 
-                // Ahora si el empuje los tira contra la pared, simplemente se detienen ahí, no se atoran
                 if (!enemigoChocaArbusto && !fueraDeMargen) {
                     enemigo.x = movX;
                     enemigo.y = movY;
@@ -403,110 +542,65 @@ function actualizarMotor() {
                 let anguloImpacto = Math.atan2(p.y - enemigo.y, p.x - enemigo.x);
                 p.pushbackFrames = 10; 
                 p.anguloPushback = anguloImpacto; 
-                if (p.hp <= 0) { alert("💀 Has muerto en Rasuto Verlies."); window.location.reload(); }
+                if (p.hp <= 0) { alert("💀 Has muerto."); window.location.reload(); }
             }
         });
-
-        gameState.proyectilesEnemigos = gameState.proyectilesEnemigos.filter(proj => {
-            proj.x += proj.vx;
-            proj.y += proj.vy;
-
-            if (proj.x < 0 || proj.x > canvas.width || proj.y < LIMITE_HUD_Y || proj.y > canvas.height) return false;
-
-            let projChocaArbusto = gameState.arbustos.some(a => Math.hypot(proj.x - a.x, proj.y - a.y) < proj.radio + a.radio);
-            if (projChocaArbusto) return false;
-
-            if (Math.hypot(p.x - proj.x, p.y - proj.y) < p.radio + proj.radio) {
-                if (p.dashFramesActivos === 0 && p.pushbackFrames === 0) {
-                    p.hp--;
-                    p.pushbackFrames = 6; 
-                    p.anguloPushback = Math.atan2(proj.vy, proj.vx); 
-                    if (p.hp <= 0) { alert("💀 Has muerto en Rasuto Verlies."); window.location.reload(); }
-                }
-                return false;
-            }
-            return true;
-        });
-        
-    if (p.atacando) {
-        gameState.enemigos.forEach(enemigo => {
-            if (enemigo.golpeadoEnEsteAtaque) return; 
-
-            let dist = Math.hypot(enemigo.x - p.x, enemigo.y - p.y);
-            if (dist <= p.rangoAtaque + enemigo.radio) {
-                let anguloEnemigo = Math.atan2(enemigo.y - p.y, enemigo.x - p.x);
-                let difAngular = Math.atan2(Math.sin(anguloEnemigo - anguloActualEspada), Math.cos(anguloEnemigo - anguloActualEspada));
-                
-                if (Math.abs(difAngular) < 0.28) {
-                    enemigo.hp -= 1; 
-                    enemigo.golpeadoEnEsteAtaque = true; 
-                    
-                    // 🔥 NUEVO: Activar los frames de empuje en lugar de teletransportar
-                    enemigo.pushbackFrames = 5; 
-                    enemigo.anguloPushback = anguloEnemigo;
-                }
-            }
-        });
-
-        // Eliminar del mapa únicamente a los enemigos cuya vida llegó a cero
-        gameState.enemigos = gameState.enemigos.filter(e => e.hp > 0);
-    }
     }
 
-
-    // --- ACTUALIZACIÓN DE PROYECTILES ENEMIGOS ---
+    // =========================================
+    // Actualización de Proyectiles ENEMIGOS
+    // =========================================
     gameState.proyectilesEnemigos = gameState.proyectilesEnemigos.filter(proj => {
         proj.x += proj.vx;
         proj.y += proj.vy;
 
-        // Desvanecer si sale de la mazmorra
         if (proj.x < 0 || proj.x > canvas.width || proj.y < LIMITE_HUD_Y || proj.y > canvas.height) return false;
 
-        // Desvanecer si choca contra un arbusto sólido
         let projChocaArbusto = gameState.arbustos.some(a => Math.hypot(proj.x - a.x, proj.y - a.y) < proj.radio + a.radio);
         if (projChocaArbusto) return false;
 
-        // Impactar jugador
         if (Math.hypot(p.x - proj.x, p.y - proj.y) < p.radio + proj.radio) {
             if (p.dashFramesActivos === 0 && p.pushbackFrames === 0) {
                 p.hp--;
                 p.pushbackFrames = 6; 
-                p.anguloPushback = Math.atan2(proj.vy, proj.vx); // Empuje en base a la trayectoria de la bala
-                if (p.hp <= 0) { alert("💀 Has muerto en Rasuto Verlies."); window.location.reload(); }
+                p.anguloPushback = Math.atan2(proj.vy, proj.vx); 
+                if (p.hp <= 0) { alert("💀 Has muerto."); window.location.reload(); }
             }
             return false;
         }
         return true;
     });
 
-    // --- CÁLCULO DE HITBOX DEL ESPADAZO (BARRIDO EN ABANICO) ---
-    if (p.atacando) {
-            gameState.enemigos.forEach(enemigo => {
-                if (enemigo.golpeadoEnEsteAtaque) return; 
+    // =========================================
+    // Actualización de Proyectiles JUGADOR (EL ARCO)
+    // =========================================
+    gameState.proyectilesJugador = gameState.proyectilesJugador.filter(proj => {
+        proj.x += proj.vx;
+        proj.y += proj.vy;
 
-                let dist = Math.hypot(enemigo.x - p.x, enemigo.y - p.y);
-                if (dist <= p.rangoAtaque + enemigo.radio) {
-                    let anguloEnemigo = Math.atan2(enemigo.y - p.y, enemigo.x - p.x);
-                    let difAngular = Math.atan2(Math.sin(anguloEnemigo - anguloActualEspada), Math.cos(anguloEnemigo - anguloActualEspada));
-                    
-                    if (Math.abs(difAngular) < 0.28) {
-                        enemigo.hp -= 1; 
-                        enemigo.golpeadoEnEsteAtaque = true; 
-                        
-                        // 🔥 REQUISITO 2: Empujar al enemigo bruscamente hacia atrás
-                        enemigo.x += Math.cos(anguloEnemigo) * 25;
-                        enemigo.y += Math.sin(anguloEnemigo) * 25;
-                    }
-                }
-            });
+        if (proj.x < 0 || proj.x > canvas.width || proj.y < LIMITE_HUD_Y || proj.y > canvas.height) return false;
 
-            // Eliminar del mapa únicamente a los enemigos cuya vida llegó a cero
-            gameState.enemigos = gameState.enemigos.filter(e => e.hp > 0);
+        let chocaArbusto = gameState.arbustos.some(a => Math.hypot(proj.x - a.x, proj.y - a.y) < proj.radio + a.radio);
+        if (chocaArbusto) return false;
+
+        let chocoEnemigo = false;
+        for (let i = 0; i < gameState.enemigos.length; i++) {
+            let enemigo = gameState.enemigos[i];
+            if (Math.hypot(enemigo.x - proj.x, enemigo.y - proj.y) < enemigo.radio + proj.radio) {
+                enemigo.hp -= proj.daño;
+                enemigo.pushbackFrames = 6; 
+                enemigo.anguloPushback = Math.atan2(proj.vy, proj.vx); 
+                chocoEnemigo = true;
+                break; 
+            }
         }
+        
+        return !chocoEnemigo; 
+    });
+    
+    gameState.enemigos = gameState.enemigos.filter(e => e.hp > 0);
+}
 
-        // Eliminar del mapa únicamente a los enemigos cuya vida llegó a cero
-        gameState.enemigos = gameState.enemigos.filter(e => e.hp > 0);
-    }
 
 /* =========================================
    REQUERIMIENTO 2: RENDERIZADO DEL NUEVO HUD Y ESCENARIO
@@ -530,25 +624,28 @@ function dibujarMotor() {
         ctx.fill();
     });
 
-    // 2. Dibujar Animación de Espada en Abanico
-    if (p.atacando) {
-        let anguloInicio = p.anguloMirada - Math.PI / 3;
-        let anguloActual = anguloInicio + (Math.PI * 2 / 3) * p.progresoAtaque;
-
+        // NUEVO: Dibujar los proyectiles del jugador (Flechas)
+    gameState.proyectilesJugador.forEach(proj => {
         ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        ctx.arc(p.x, p.y, p.rangoAtaque, anguloInicio, anguloActual);
-        ctx.lineTo(p.x, p.y);
-        ctx.fillStyle = 'rgba(255, 235, 59, 0.22)';
+        ctx.arc(proj.x, proj.y, proj.radio, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFD700'; // Color dorado
         ctx.fill();
-
+        
+        // Efecto de estela de la flecha
         ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        ctx.lineTo(p.x + Math.cos(anguloActual) * p.rangoAtaque, p.y + Math.sin(anguloActual) * p.rangoAtaque);
-        ctx.strokeStyle = '#fff59d';
-        ctx.lineWidth = 4;
+        ctx.moveTo(proj.x, proj.y);
+        ctx.lineTo(proj.x - proj.vx * 1.5, proj.y - proj.vy * 1.5);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
         ctx.stroke();
+    });
+
+
+        // 2. Dibujar Animaciones de Armas (DELEGADO AL DICCIONARIO)
+    if (p.atacando) {
+        CONFIG_ARMAS[p.armaActual].dibujar(ctx, p, p.progresoAtaque);
     }
+
 
     // Dibujar Onda del Escudo Expansivo si está activo
     if (p.escudoActivo) {
@@ -674,50 +771,62 @@ document.getElementById('btn-cerrar-debug').addEventListener('click', () => {
 
 function abrirMenuCofre() {
     gameState.corriendo = false;
-    document.exitPointerLock(); // Liberar ratón para permitir la selección en la UI
+    document.exitPointerLock(); 
     
     const p = gameState.jugador;
     const contenedor = document.getElementById('contenedor-opciones');
-    contenedor.innerHTML = ''; // Limpiar cartas previas
+    contenedor.innerHTML = ''; 
 
-    // Lista total de bendiciones posibles en el juego
-    const bancoMejoras = [
-        { titulo: "❤️ VITA MAXIMA", desc: "+1 Corazón máximo permanente", ejec: () => { p.maxHp++; p.hp++; } },
-        { titulo: "⚡ CELERIDAD", desc: "+15% Velocidad de movimiento", ejec: () => { p.velocidad *= 1.15; } },
-        { titulo: "⚔️ FILO ACELERADO", desc: "+20% Velocidad de ataque con armas", ejec: () => { p.velocidadAtaqueItem += 5; } },
-        { titulo: "🛡️ ESCUDO DE FUERZA", desc: "Desbloquea Escudo Expansivo (Click Derecho)", ejec: () => { p.tieneEscudo = true; } },
-        { titulo: "🏹 ARCO DE CAZA", desc: "Equipar Arco (Estadísticas adaptadas)", ejec: () => { p.armaActual = 'arco'; p.rangoAtaque = 180; p.ataqueCooldownTotal = 35; } },
-        { titulo: "🥊 PUÑOS DE HIERRO", desc: "Equipar Puños (Ataque rápido de corto alcance)", ejec: () => { p.armaActual = 'punios'; p.rangoAtaque = 40; p.ataqueCooldownTotal = 14; } }
-    ];
+    let opcionesValidas = [];
 
-    // Mezclar el banco de mejoras y extraer exactamente 3 únicas
-    const seleccionadas = [];
-    while (seleccionadas.length < 3) {
-        let indiceRandom = Math.floor(Math.random() * bancoMejoras.length);
-        let opcion = bancoMejoras[indiceRandom];
-        if (!seleccionadas.includes(opcion)) {
-            seleccionadas.push(opcion);
+    // SI TIENE PUÑOS: Forzamos que salgan armas (y el escudo si no lo tiene)
+    if (p.armaActual === 'punios') {
+        // 🔥 CORRECCIÓN AQUÍ: Solo cambiamos el nombre del arma, el motor hace el resto
+        opcionesValidas.push({ titulo: "⚔️ ESPADA DE BRONCE", desc: "Ataque de barrido (Rango medio)", ejec: () => { p.armaActual = 'espada'; } });
+        opcionesValidas.push({ titulo: "🏹 ARCO DE CAZA", desc: "Disparo a distancia (Próximamente)", ejec: () => { p.armaActual = 'arco'; } });
+        
+        if (!p.tieneEscudo) {
+            opcionesValidas.push({ titulo: "🛡️ ESCUDO DE FUERZA", desc: "Bloquea y empuja (Click Derecho)", ejec: () => { p.tieneEscudo = true; } });
+        } else {
+            opcionesValidas.push({ titulo: "❤️ VITA MAXIMA", desc: "+1 Corazón máximo", ejec: () => { p.maxHp++; p.hp++; } });
         }
+    } 
+
+    // SI YA TIENE ARMA: Solo salen mejoras de stats y el escudo (si aún no lo tiene)
+    else {
+        let bancoMejoras = [
+            { titulo: "❤️ VITA MAXIMA", desc: "+1 Corazón máximo permanente", ejec: () => { p.maxHp++; p.hp++; } },
+            { titulo: "⚡ CELERIDAD", desc: "+15% Velocidad de movimiento", ejec: () => { p.velocidad *= 1.15; } },
+            { titulo: "⚔️ FILO ACELERADO", desc: "+15% Vel. de ataque y animación", ejec: () => { p.velocidadAtaqueItem += 5; } }
+        ];
+        if (!p.tieneEscudo) {
+            bancoMejoras.push({ titulo: "🛡️ ESCUDO DE FUERZA", desc: "Desbloquea Escudo (Click Derecho)", ejec: () => { p.tieneEscudo = true; } });
+        }
+        opcionesValidas = bancoMejoras;
     }
 
-    // Construir los elementos HTML de las cartas en pantalla
-// Busca esto dentro de la función abrirMenuCofre() y reemplázalo:
+    // Seleccionar aleatoriamente de las opciones válidas (Máximo 3)
+    const seleccionadas = [];
+    while (seleccionadas.length < Math.min(3, opcionesValidas.length)) {
+        let indiceRandom = Math.floor(Math.random() * opcionesValidas.length);
+        let opcion = opcionesValidas[indiceRandom];
+        if (!seleccionadas.includes(opcion)) seleccionadas.push(opcion);
+    }
+
+    // Dibujar las cartas
     seleccionadas.forEach(opcion => {
         const carta = document.createElement('button');
         carta.className = 'carta-opcion';
-        carta.innerHTML = `<div>${opcion.titulo}</div><div style="font-size:11px; font-weight:normal; margin-top:5px; color:#aaa;">${opcion.desc}</div>`;
-        
+        carta.innerHTML = `<div>${opcion.titulo}</div><div style="font-size:11px; margin-top:5px; color:#aaa;">${opcion.desc}</div>`;
         carta.addEventListener('click', () => {
             opcion.ejec(); 
-            
-            // Ocultar menú y reanudar partida
             document.getElementById('pantalla-cofre').style.display = 'none';
             canvas.requestPointerLock();
         });
-        
         contenedor.appendChild(carta);
     });
 
-    // Mostrar el panel de recompensas
     document.getElementById('pantalla-cofre').style.display = 'flex';
 }
+
+
