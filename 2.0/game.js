@@ -34,7 +34,7 @@ const CONFIG_ARMAS = {
             ctx.stroke();
         }
     },
-    espada: {
+        espada: {
         nombre: 'Espada de Bronce',
         rango: 65,
         daño: 1,
@@ -96,7 +96,48 @@ const CONFIG_ARMAS = {
             
             ctx.restore();
         }
-    }
+    },  
+        lanza: {
+        nombre: 'Lanza Guardiana',
+        rango: 120, // 👈 Mucho más largo que la espada (65)
+        daño: 1,
+        cooldownBase: 35,
+        velocidadAnimacion: 0.12, // Estocada rápida
+        tipoHitbox: 'recta', // 👈 ¡Reutilizamos la lógica frontal de los puños!
+        dibujar: (ctx, p, progreso) => {
+            // Calculamos el efecto de estocada (va y vuelve rápido)
+            let avance = progreso < 0.5 ? progreso * 2 : (1 - progreso) * 2; 
+            let alcanceGolpe = avance * CONFIG_ARMAS['lanza'].rango;
+            
+            let cos = Math.cos(p.anguloMirada);
+            let sin = Math.sin(p.anguloMirada);
+            
+            // Posición de inicio y fin de la lanza
+            let inicioX = p.x + cos * p.radio; 
+            let inicioY = p.y + sin * p.radio;
+            let finX = p.x + cos * alcanceGolpe;
+            let finY = p.y + sin * alcanceGolpe;
+
+            // 1. Dibujar el palo de madera
+            ctx.beginPath();
+            ctx.moveTo(inicioX, inicioY);
+            ctx.lineTo(finX, finY);
+            ctx.strokeStyle = '#8B4513'; // Color madera
+            ctx.lineWidth = 6; // Delgada
+            ctx.stroke();
+
+            // 2. Dibujar la punta de metal (solo si ya avanzó un poco)
+            if (avance > 0.1) {
+                ctx.beginPath();
+                ctx.moveTo(finX - cos * 20, finY - sin * 20); // 20px antes del final
+                ctx.lineTo(finX, finY); // Hasta la punta
+                ctx.strokeStyle = '#E0E0E0'; // Metal brillante plateado
+                ctx.lineWidth = 8; // Un poquito más gruesa la punta
+                ctx.stroke();
+            }
+        }
+    },
+
 };
 
 const gameState = {
@@ -784,6 +825,7 @@ function abrirMenuCofre() {
         // 🔥 CORRECCIÓN AQUÍ: Solo cambiamos el nombre del arma, el motor hace el resto
         opcionesValidas.push({ titulo: "⚔️ ESPADA DE BRONCE", desc: "Ataque de barrido (Rango medio)", ejec: () => { p.armaActual = 'espada'; } });
         opcionesValidas.push({ titulo: "🏹 ARCO DE CAZA", desc: "Disparo a distancia (Próximamente)", ejec: () => { p.armaActual = 'arco'; } });
+        opcionesValidas.push({ titulo: "🔱 LANZA GUARDIANA", desc: "Estocada recta (Largo alcance)", ejec: () => { p.armaActual = 'lanza'; } });
         
         if (!p.tieneEscudo) {
             opcionesValidas.push({ titulo: "🛡️ ESCUDO DE FUERZA", desc: "Bloquea y empuja (Click Derecho)", ejec: () => { p.tieneEscudo = true; } });
