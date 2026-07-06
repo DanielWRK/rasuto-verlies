@@ -1,0 +1,1 @@
+Hay un bug que no actualiza cuando le doy abandonar partida, sigue guardado las estadisticas
