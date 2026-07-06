@@ -215,6 +215,50 @@ document.getElementById('btn-salir').addEventListener('click', () => {
     document.exitPointerLock();
 });
 
+// Guardar Partida (Botón de Pausa)
+document.getElementById('btn-guardar')?.addEventListener('click', () => {
+    // Validar que no haya monstruos vivos
+    if (gameState.enemigos.length > 0) {
+        alert("⚔️ ¡No puedes descansar ahora! Aún hay enemigos en esta zona.");
+        return;
+    }
+
+    // Empaquetar la memoria vital
+    const datosGuardado = {
+        zonaActual: gameState.zonaActual + 1,
+        jugador: gameState.jugador
+    };
+
+    // Guardar en el navegador (Convertido a Texto)
+    localStorage.setItem('rasuto_save', JSON.stringify(datosGuardado));
+    alert("✅ Progreso guardado con éxito. Puedes abandonar la partida seguro.");
+});
+
+// Cargar Partida (Botón de Inicio)
+document.getElementById('btn-cargar')?.addEventListener('click', () => {
+    const partidaGuardada = localStorage.getItem('rasuto_save');
+    
+    if (partidaGuardada) {
+        // Desempaquetar la memoria
+        const datosCargados = JSON.parse(partidaGuardada);
+        
+        // Restaurar estado
+        gameState.zonaActual = datosCargados.zonaActual;
+        // Fusionamos los stats guardados del jugador con el objeto actual
+        Object.assign(gameState.jugador, datosCargados.jugador);
+        
+        pantallaInicio.style.display = 'none';
+        contenedorJuego.style.display = 'block';
+        canvas.requestPointerLock();
+        
+        // Generar la zona correspondiente a la que guardó
+        generarZona(); 
+    } else {
+        alert("❌ No se encontró ninguna partida guardada en este navegador.");
+    }
+});
+
+
 document.addEventListener('pointerlockchange', () => {
     if (document.pointerLockElement === canvas) {
         gameState.corriendo = true;
@@ -310,56 +354,60 @@ document.addEventListener('keydown', (e) => {
 /* =========================================
    REQUERIMIENTO 3: GENERACIÓN PROCEDURAL CONTINUA
    ========================================= */
+
 function generarZona() {
     gameState.arbustos = [];
     gameState.enemigos = [];
     gameState.cofres = [];
     gameState.proyectilesEnemigos = []; 
     gameState.proyectilesJugador = [];
+    gameState.portalActivo = false; // Reiniciamos el portal
+
+    // 🧮 FÓRMULA DE DIFICULTAD ESCALABLE
+    let zona = gameState.zonaActual;
+    let densidadMundo = Math.min(0.35, 0.20 + (zona * 0.015)); // El mapa se llena más
+    let multiplicadorStats = 1 + (zona * 0.15); // +15% stats por nivel
 
     for (let gY = 0; gY < GRID_SIZE; gY++) {
-        // Ignorar por completo la primera fila superior para evitar choques con el HUD
-        if (gY === 0) continue; 
-
+        if (gY === 0) continue; // Respetar HUD
         for (let gX = 0; gX < GRID_SIZE; gX++) {
-            // No generar nada en el centro (donde nace el jugador)
-            if (gX === 4 && gY === 4) continue;
+            // Zona segura en el centro (Nacimiento del jugador y Portal)
+            if ((gX === 4 && gY === 4) || (gX === 3 && gY === 4) || (gX === 4 && gY === 3)) continue;
 
-            if (Math.random() < 0.22) { 
-                let dadoGlobal = Math.random();
+            if (Math.random() < densidadMundo) { 
                 let cx = gX * CELL_SIZE + CELL_SIZE / 2;
                 let cy = gY * CELL_SIZE + CELL_SIZE / 2;
+                let dadoGlobal = Math.random();
 
-                if (dadoGlobal < 0.12) {
+                if (dadoGlobal < 0.10) {
                     gameState.cofres.push({ x: cx, y: cy, radio: 18 });
-                } else if (dadoGlobal < 0.45) {
-                    
+                } else if (dadoGlobal < 0.50) {
                     let dadoTipoEnemigo = Math.random();
                     let nuevoEnemigo = { x: cx, y: cy, golpeadoEnEsteAtaque: false, pushbackFrames: 0, anguloPushback: 0 };
                     
                     if (dadoTipoEnemigo < 0.50) {
                         nuevoEnemigo.tipo = 'zombie';
-                        nuevoEnemigo.hp = 3;
-                        nuevoEnemigo.velocidad = 0.5; // Tu velocidad personalizada
+                        nuevoEnemigo.hp = Math.floor(3 * multiplicadorStats); // Escala vida
+                        nuevoEnemigo.velocidad = 0.5 * multiplicadorStats; // Escala velocidad
                         nuevoEnemigo.radio = 16;
                         nuevoEnemigo.emoji = '🧟';
                         nuevoEnemigo.timerPatrulla = 0;
-                        nuevoEnemigo.vx = 0;
-                        nuevoEnemigo.vy = 0;
+                        nuevoEnemigo.vx = 0; nuevoEnemigo.vy = 0;
                     } else if (dadoTipoEnemigo < 0.80) {
                         nuevoEnemigo.tipo = 'kamikaze';
-                        nuevoEnemigo.hp = 1;
-                        nuevoEnemigo.velocidad = 1.2; // Tu velocidad personalizada
+                        nuevoEnemigo.hp = Math.floor(1 * multiplicadorStats);
+                        nuevoEnemigo.velocidad = 1.2 * multiplicadorStats;
                         nuevoEnemigo.radio = 14;
                         nuevoEnemigo.emoji = '🏃‍♂️';
                     } else {
                         nuevoEnemigo.tipo = 'lanzador';
-                        nuevoEnemigo.hp = 2;
+                        nuevoEnemigo.hp = Math.floor(2 * multiplicadorStats);
                         nuevoEnemigo.velocidad = 0;
                         nuevoEnemigo.radio = 16;
                         nuevoEnemigo.emoji = '🧙‍♂️';
-                        // Retraso seguro de disparo inicial (1.5 segundos)
-                        nuevoEnemigo.cooldownDisparo = 90 + Math.floor(Math.random() * 60); 
+                        // Disparan más rápido a mayor nivel
+                        nuevoEnemigo.cooldownBase = Math.max(40, 100 - (zona * 5)); 
+                        nuevoEnemigo.cooldownDisparo = 90; 
                     }
                     gameState.enemigos.push(nuevoEnemigo);
                 } else {
@@ -369,9 +417,12 @@ function generarZona() {
         }
     }
     
-    // 🔥 PERIODO DE GRACIA: 90 frames (1.5 segundos) al iniciar el mapa
+    // Devolvemos al jugador al centro
+    gameState.jugador.x = 450;
+    gameState.jugador.y = 450;
     gameState.retrasoArranque = 90; 
 }
+
 
 /* =========================================
    ACTUALIZACIÓN DE FÍSICAS Y REFUERZOS
@@ -640,6 +691,19 @@ function actualizarMotor() {
     });
     
     gameState.enemigos = gameState.enemigos.filter(e => e.hp > 0);
+
+    // 🔥 LÓGICA DEL PORTAL
+    if (gameState.enemigos.length === 0 && gameState.retrasoArranque <= 0) {
+        gameState.portalActivo = true;
+        // Si el jugador toca el centro del mapa (400, 400)
+        if (Math.hypot(p.x - 400, p.y - 400) < p.radio + 25) {
+            gameState.zonaActual++; // Subimos nivel
+            generarZona(); // Generamos el siguiente piso
+        }
+    } else {
+        gameState.portalActivo = false;
+    }
+
 }
 
 
@@ -743,6 +807,8 @@ function dibujarMotor() {
     let corazonesTexto = '❤️'.repeat(Math.max(0, p.hp)) + '🖤'.repeat(corazonesNegros);
     ctx.fillText(corazonesTexto, 20, 31);
 
+    ctx.fillText(`ZONA: ${gameState.zonaActual}`, 320, 31); 
+    
     // REQUISITO: Barra renombrada a STAMINA con cálculo de porcentaje sobre 100 puntos
     ctx.fillText("STAMINA:", 440, 31);
     ctx.fillStyle = '#333';
@@ -752,8 +818,6 @@ function dibujarMotor() {
     // Cambia a rojo si no tienes energía suficiente para realizar un Dash básico
     ctx.fillStyle = (p.stamina < p.costoDash) ? '#ff4d4d' : '#4CAF50'; 
     ctx.fillRect(540, 16, 200 * porcentajeStamina, 16);
-
-    // (Al final de dibujarMotor)
     
     // Feedback visual del Retraso Inicial
     if (gameState.retrasoArranque > 0) {
@@ -767,6 +831,28 @@ function dibujarMotor() {
         ctx.fillText(`PREPÁRATE... ${segundos}`, canvas.width / 2, canvas.height / 2);
         ctx.textAlign = 'left'; // Resetear alineación
     }
+
+        // (Al final de dibujarMotor)
+    // Dibujar el Portal de Descenso si está activo
+    if (gameState.portalActivo) {
+        let pulso = Math.sin(Date.now() / 150) * 4; // Animación de latido
+        
+        ctx.beginPath();
+        ctx.arc(400, 400, 25 + pulso, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(156, 39, 176, 0.7)'; // Morado místico
+        ctx.fill();
+        ctx.strokeStyle = '#E1BEE7';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('DESCENDER', 400, 360);
+        ctx.textAlign = 'left';
+    }
+
+    
 }
 
 function bucleJuego() {

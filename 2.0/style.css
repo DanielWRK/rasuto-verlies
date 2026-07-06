@@ -4,12 +4,22 @@ body {
     font-family: monospace;
     text-align: center;
     margin: 0;
+    padding: 0;
     overflow: hidden; /* Evita barras de desplazamiento */
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
 }
+
+#gameCanvas {
+    background-color: #222;
+    /* ESTA ES LA MAGIA: */
+    max-width: 100vw;   /* Nunca más ancho que la ventana */
+    max-height: 100vh;  /* Nunca más alto que la ventana */
+    object-fit: contain; /* Mantiene la proporción 800x800 sin deformarse */
+}
+
 
 h1 { color: #ff4d4d; }
 
