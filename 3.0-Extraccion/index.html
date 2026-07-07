@@ -17,7 +17,25 @@
     <!-- 2. PANTALLA PAUSA -->
     <div id="pantalla-pausa" class="pantalla" style="display: none;">
         <div id="panel-debug" class="pantalla" style="display: none; background: rgba(0,20,0,0.95); border: 2px solid #0f0;">
-            <!-- ... (Tu panel debug se queda igual) ... -->
+            <h1 style="color: #0f0;">⚙️ MODO DESARROLLADOR</h1>
+            <div style="text-align: left; color: white; margin-bottom: 20px; font-size: 18px;">
+                <h3>Enemigos y Mundo</h3>
+                <label><input type="checkbox" id="dbg-enemigos" checked> IA de Enemigos Activa</label><br>
+                
+                <h3>Estadísticas del Jugador</h3>
+                <label>Zona/Nivel Actual: <input type="number" id="dbg-zona" value="1" min="1" style="width: 60px;"></label><br>
+                <label>Salud Actual: <input type="number" id="dbg-hp" value="3" style="width: 60px;"></label><br>
+                
+                <label>Arma Equipada: 
+                    <select id="dbg-arma" style="padding: 5px;">
+                        <option value="punios">Puños</option>
+                        <option value="espada">Espada</option>
+                        <option value="arco">Arco</option>
+                        <option value="lanza">Lanza</option>
+                    </select>
+                </label><br>
+            </div>
+            <button id="btn-cerrar-debug" style="background-color: #0f0; color: black; font-weight: bold;">GUARDAR Y REANUDAR</button>
         </div>
         <h1>PAUSA</h1>
         <div style="display: flex; gap: 20px; margin-top: 20px;">
@@ -40,10 +58,13 @@
         <canvas id="gameCanvas" width="800" height="800"></canvas>
     </div>
 
-    <script src="js/config.js"></script>         <!-- 1. El diccionario de armas -->
-    <script src="js/estado.js"></script>         <!-- 2. La memoria global y variables -->
-    <script src="js/motor_fisico.js"></script>   <!-- 3. Colisiones y movimiento -->
-    <script src="js/motor_grafico.js"></script>  <!-- 4. Dibujo en el canvas -->
-    <script src="js/main.js"></script>           <!-- 5. Bucle principal y generación -->
-    <script src="js/controles.js"></script>      <!-- 6. Teclado, ratón y botones -->
+    <script src="js/config_armas.js"></script>    
+    <script src="js/config_enemigos.js"></script>
+    <script src="js/config_jefes.js"></script> 
+    <script src="js/estado.js"></script>         
+    <script src="js/motor_fisico.js"></script>   
+    <script src="js/motor_grafico.js"></script>  
+    <script src="js/main.js"></script>           
+    <script src="js/controles.js"></script>   
+       
 </body>

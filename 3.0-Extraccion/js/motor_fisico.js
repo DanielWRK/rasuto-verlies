@@ -58,7 +58,9 @@ function actualizarMotor() {
         // Daño Melee
         if (arma.tipoHitbox !== 'proyectil') { 
             gameState.enemigos.forEach(enemigo => {
+                if (enemigo.tipo.startsWith('jefe')) return;
                 if (enemigo.golpeadoEnEsteAtaque) return; 
+
                 let dist = Math.hypot(enemigo.x - p.x, enemigo.y - p.y);
                 
                 if (dist <= arma.rango + enemigo.radio) {
@@ -143,9 +145,83 @@ function actualizarMotor() {
     // =========================================
     // Actualización de Enemigos
     // =========================================
+    // =========================================
+    // Actualización de Enemigos y Jefes
+    // =========================================
     if (gameState.debug.enemigosActivos) {
         gameState.enemigos.forEach(enemigo => {
             let distAlJugador = Math.hypot(p.x - enemigo.x, p.y - enemigo.y);
+            
+            // 🔥 LÓGICA DEL JEFE PING-PONG
+            if (enemigo.tipo === 'jefe_pingpong') {
+                if (!enemigo.bola) {
+                    enemigo.timerAtaque--;
+                    if (enemigo.timerAtaque <= 0) {
+                        // El Jefe Sirve la pelota
+                        let angulo = Math.atan2(p.y - enemigo.y, p.x - enemigo.x);
+                        enemigo.bola = {
+                            x: enemigo.x, y: enemigo.y,
+                            velocidad: 5,
+                            vx: Math.cos(angulo) * 5, vy: Math.sin(angulo) * 5,
+                            radio: 12, propietario: 'jefe'
+                        };
+                    }
+                } else {
+                    let b = enemigo.bola;
+                    b.x += b.vx; b.y += b.vy;
+
+                    // Rebote en paredes del cuarto
+                    if(b.x < b.radio || b.x > canvas.width - b.radio) b.vx *= -1;
+                    if(b.y < 50 + b.radio || b.y > canvas.height - b.radio) b.vy *= -1;
+
+                    // Choque con el Jugador
+                    if (b.propietario === 'jefe' && Math.hypot(p.x - b.x, p.y - b.y) < p.radio + b.radio) {
+                        // ¿Está usando estamina? (Dash o Escudo)
+                        if (p.dashFramesActivos > 0 || p.escudoActivo) {
+                            // PARRY EXITOSO
+                            b.propietario = 'jugador';
+                            b.velocidad += 2; // La bola se acelera
+                            b.vx = Math.cos(p.anguloMirada) * b.velocidad;
+                            b.vy = Math.sin(p.anguloMirada) * b.velocidad;
+                        } else {
+                            // DAÑO AL JUGADOR
+                            p.hp--;
+                            p.pushbackFrames = 10;
+                            p.anguloPushback = Math.atan2(b.vy, b.vx);
+                            enemigo.bola = null;
+                            enemigo.timerAtaque = 60;
+                            if (p.hp <= 0) { alert("💀 Has muerto."); window.location.reload(); }
+                        }
+                    }
+
+                    // Choque con el Jefe (Cuando el jugador se la devuelve)
+                    if (enemigo.bola && b.propietario === 'jugador') {
+                        // IA: El jefe persigue la pelota en el eje X para intentar atraparla
+                        let velocidadJefe = 3 + (3 - enemigo.hp) * 2; // Más rápido con menos vida
+                        if (enemigo.x < b.x - 10) enemigo.x += velocidadJefe;
+                        if (enemigo.x > b.x + 10) enemigo.x -= velocidadJefe;
+
+                        if (Math.hypot(enemigo.x - b.x, enemigo.y - b.y) < enemigo.radio + b.radio) {
+                            // Matemáticas de fallo
+                            let probFallo = (enemigo.hp === 3) ? 0.50 : (enemigo.hp === 2) ? 0.25 : 0.10;
+                            
+                            if (Math.random() < probFallo) {
+                                enemigo.hp--; // JEFE RECIBE DAÑO
+                                enemigo.bola = null;
+                                enemigo.timerAtaque = 90;
+                            } else {
+                                // JEFE HACE PARRY
+                                b.propietario = 'jefe';
+                                b.velocidad += 1.5;
+                                let angulo = Math.atan2(p.y - enemigo.y, p.x - enemigo.x);
+                                b.vx = Math.cos(angulo) * b.velocidad;
+                                b.vy = Math.sin(angulo) * b.velocidad;
+                            }
+                        }
+                    }
+                }
+                return; // Termina el turno del jefe, salta a la siguiente iteración
+            }
             let movX = enemigo.x;
             let movY = enemigo.y;
 
@@ -253,6 +329,10 @@ function actualizarMotor() {
         for (let i = 0; i < gameState.enemigos.length; i++) {
             let enemigo = gameState.enemigos[i];
             if (Math.hypot(enemigo.x - proj.x, enemigo.y - proj.y) < enemigo.radio + proj.radio) {
+                if (enemigo.tipo.startsWith('jefe')) {
+                    chocoEnemigo = true; 
+                    break;
+                }
                 enemigo.hp -= proj.daño;
                 enemigo.pushbackFrames = 6; 
                 enemigo.anguloPushback = Math.atan2(proj.vy, proj.vx); 
@@ -286,4 +366,24 @@ function actualizarMotor() {
             }
         }
     }
+
+        // Filtrar enemigos muertos y disparar recompensa de Jefe
+    for (let i = gameState.enemigos.length - 1; i >= 0; i--) {
+        let e = gameState.enemigos[i];
+        if (e.hp <= 0) {
+            if (e.tipo.startsWith('jefe')) {
+                gameState.esperandoCofreJefe = 120; // 2 segundos (120 frames) de delay
+            }
+            gameState.enemigos.splice(i, 1);
+        }
+    }
+
+    // Temporizador de victoria
+    if (gameState.esperandoCofreJefe > 0) {
+        gameState.esperandoCofreJefe--;
+        if (gameState.esperandoCofreJefe === 0) {
+            abrirMenuCofre(); // Se abre el cofre tras el delay
+        }
+    }
+
 }

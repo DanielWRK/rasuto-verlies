@@ -7,7 +7,25 @@ function dibujarMotor() {
 
     // 1. Dibujar Entidades con Hitboxes Sincronizadas
     gameState.cofres.forEach(c => { ctx.font = '24px Arial'; ctx.fillText('🎁', c.x - 12, c.y + 10); });
-    gameState.enemigos.forEach(e => { ctx.font = '24px Arial'; ctx.fillText(e.emoji, e.x - 12, e.y + 10); });
+    gameState.enemigos.forEach(e => { 
+        // Si es jefe, el emoji es gigante
+        let esJefe = e.tipo.startsWith('jefe');
+        ctx.font = (esJefe ? '50px' : '24px') + ' Arial'; 
+        ctx.fillText(e.emoji, e.x - (esJefe ? 25 : 12), e.y + (esJefe ? 18 : 10)); 
+
+        // Dibujar bola de energía si el jefe la tiene
+        if(e.bola) {
+            ctx.beginPath();
+            ctx.arc(e.bola.x, e.bola.y, e.bola.radio, 0, Math.PI * 2);
+            // Rojo si viene hacia ti, Verde si tú se la devolviste
+            ctx.fillStyle = e.bola.propietario === 'jefe' ? '#ff4d4d' : '#4CAF50';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    });
+
     
     // REQUISITO: Ajustar el arbusto para que no deje espacios vacíos de colisión invisible
     gameState.arbustos.forEach(a => { ctx.font = '32px Arial'; ctx.fillText('🌲', a.x - 16, a.y + 11); });

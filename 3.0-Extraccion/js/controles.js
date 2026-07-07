@@ -170,22 +170,68 @@ document.addEventListener('keydown', (e) => {
 // Abrir el panel con F2
 document.addEventListener('keydown', (e) => {
     if (e.key === 'F2') {
-        if (gameState.corriendo) document.exitPointerLock(); // Pausa forzada
-        document.getElementById('pantalla-pausa').style.display = 'none';
-        document.getElementById('panel-debug').style.display = 'flex';
+        if (gameState.escenaActual === 'MAZMORRA' || gameState.escenaActual === 'LOBBY') {
+            cambiarEscena('PAUSA');
+        }
         
-        document.getElementById('dbg-hp').value = gameState.jugador.hp;
+        if (gameState.escenaActual === 'PAUSA') {
+            const panelDebug = document.getElementById('panel-debug');
+            if (panelDebug) panelDebug.style.display = 'flex';
+            
+            // Verificación de seguridad antes de asignar valores
+            const inputHp = document.getElementById('dbg-hp');
+            if (inputHp) inputHp.value = gameState.jugador.hp;
+
+            // 🔥 NUEVO: Cargar la zona actual en el panel
+            const inputZona = document.getElementById('dbg-zona');
+            if (inputZona) inputZona.value = gameState.zonaActual;
+        }
     }
 });
 
 // Botón de guardar y reanudar (Debug)
 document.getElementById('btn-cerrar-debug')?.addEventListener('click', () => {
-      gameState.debug.enemigosActivos = document.getElementById('dbg-enemigos').checked;
-    gameState.jugador.hp = parseInt(document.getElementById('dbg-hp').value);
-    gameState.jugador.armaActual = document.getElementById('dbg-arma').value;
-    gameState.debug.mejoras.fuego = document.getElementById('dbg-fuego').checked;
-    gameState.debug.mejoras.dashDanino = document.getElementById('dbg-dash').checked;
     
-    document.getElementById('panel-debug').style.display = 'none';
-    canvas.requestPointerLock();
+    // 🔥 NUEVO: Verificamos si el dev quiere teletransportarse de zona
+    let recargarNivel = false;
+    const inputZona = document.getElementById('dbg-zona');
+    if (inputZona) {
+        let zonaDeseada = parseInt(inputZona.value);
+        // Si el número en la caja es distinto a la zona en la que estamos...
+        if (zonaDeseada !== gameState.zonaActual && zonaDeseada >= 1) {
+            gameState.zonaActual = zonaDeseada;
+            recargarNivel = true; // ...activamos la bandera para regenerar el mapa
+        }
+    }
+
+    // Extracción segura del resto de datos
+    const chkEnemigos = document.getElementById('dbg-enemigos');
+    if (chkEnemigos) gameState.debug.enemigosActivos = chkEnemigos.checked;
+    
+    const inputHp = document.getElementById('dbg-hp');
+    if (inputHp) gameState.jugador.hp = parseInt(inputHp.value);
+    
+    const selArma = document.getElementById('dbg-arma');
+    if (selArma) gameState.jugador.armaActual = selArma.value;
+    
+    const chkFuego = document.getElementById('dbg-fuego');
+    if (chkFuego) gameState.debug.mejoras.fuego = chkFuego.checked;
+    
+    const chkDash = document.getElementById('dbg-dash');
+    if (chkDash) gameState.debug.mejoras.dashDanino = chkDash.checked;
+    
+    // Ocultar panel
+    const panelDebug = document.getElementById('panel-debug');
+    if (panelDebug) panelDebug.style.display = 'none';
+    
+    // 🔥 RUTEO INTELIGENTE: ¿Regeneramos el nivel o solo quitamos la pausa?
+    if (recargarNivel) {
+        gameState.tipoPortal = 'DESCENSO'; // Asegurarnos de que estamos en modo Mazmorra
+        generarZona(); // Mágia: Genera los enemigos/jefe de ese nuevo nivel
+        cambiarEscena('MAZMORRA');
+    } else if (gameState.tipoPortal === 'ENTRADA_MAZMORRA') {
+        cambiarEscena('LOBBY');
+    } else {
+        cambiarEscena('MAZMORRA');
+    }
 });

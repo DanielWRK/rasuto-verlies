@@ -68,76 +68,140 @@ function generarLobby() {
 
 
 /* =========================================
-   GENERACIÓN PROCEDURAL CONTINUA
+   GENERACIÓN PROCEDURAL Y DIFICULTAD
    ========================================= */
-
 function generarZona() {
     gameState.arbustos = [];
     gameState.enemigos = [];
     gameState.cofres = [];
     gameState.proyectilesEnemigos = []; 
     gameState.proyectilesJugador = [];
-    gameState.portalActivo = false; // Reiniciamos el portal
+    gameState.portalActivo = false;
 
-    // 🧮 FÓRMULA DE DIFICULTAD ESCALABLE
     let zona = gameState.zonaActual;
-    let densidadMundo = Math.min(0.35, 0.20 + (zona * 0.015)); // El mapa se llena más
-    let multiplicadorStats = 1 + (zona * 0.15); // +15% stats por nivel
 
-    for (let gY = 0; gY < GRID_SIZE; gY++) {
-        if (gY === 0) continue; // Respetar HUD
+    // 🔥 SALA DE JEFE (Pisos 5, 10, 15...)
+    if (zona % 5 === 0) {
+        let def = CONFIG_JEFES['pingpong'];
+        let jefe = { 
+            x: 400, y: 150, 
+            tipo: def.tipo, hp: def.hpBase, radio: def.radio, emoji: def.emoji,
+            golpeadoEnEsteAtaque: false, pushbackFrames: 0, anguloPushback: 0 
+        };
+        def.init(jefe);
+        gameState.enemigos.push(jefe);
+
+        // Generar algunos arbustos aleatorios como obstáculos, SIN COFRES
+        for(let i=0; i<12; i++) {
+            gameState.arbustos.push({ x: 100 + Math.random()*600, y: 250 + Math.random()*450, radio: 22 });
+        }
+        // Posicionar jugador y salir
+        gameState.jugador.x = 400; gameState.jugador.y = 650;
+        gameState.retrasoArranque = 90; 
+        return; // ¡Termina la generación aquí para que no salgan enemigos normales!
+    }
+
+    // 1. ESCALADO MATEMÁTICO SUAVE
+    // Zona 1 = Multiplicador 1.0 (Sin buffs). Zona 2 = 1.15, etc.
+    let multiplicadorStats = 1 + ((zona - 1) * 0.15); 
+    
+    // El mapa se llena un poco más cada nivel
+    let densidadMundo = Math.min(0.40, 0.20 + (zona * 0.02)); 
+
+    // 2. GARANTIZAR COFRES Y EVITAR SUPERPOSICIONES
+    let cofresGarantizados = (zona === 1) ? 2 : 1; // Piso 1 asegura 2 cofres para armarte
+    let celdasLibres = [];
+
+    // Recopilamos todas las celdas válidas del mapa
+    for (let gY = 1; gY < GRID_SIZE; gY++) { 
         for (let gX = 0; gX < GRID_SIZE; gX++) {
-            // Zona segura en el centro (Nacimiento del jugador y Portal)
+            // Ignoramos la zona segura central (donde nace el jugador)
             if ((gX === 4 && gY === 4) || (gX === 3 && gY === 4) || (gX === 4 && gY === 3)) continue;
-
-            if (Math.random() < densidadMundo) { 
-                let cx = gX * CELL_SIZE + CELL_SIZE / 2;
-                let cy = gY * CELL_SIZE + CELL_SIZE / 2;
-                let dadoGlobal = Math.random();
-
-                if (dadoGlobal < 0.10) {
-                    gameState.cofres.push({ x: cx, y: cy, radio: 18 });
-                } else if (dadoGlobal < 0.50) {
-                    let dadoTipoEnemigo = Math.random();
-                    let nuevoEnemigo = { x: cx, y: cy, golpeadoEnEsteAtaque: false, pushbackFrames: 0, anguloPushback: 0 };
-                    
-                    if (dadoTipoEnemigo < 0.50) {
-                        nuevoEnemigo.tipo = 'zombie';
-                        nuevoEnemigo.hp = Math.floor(3 * multiplicadorStats); // Escala vida
-                        nuevoEnemigo.velocidad = 0.5 * multiplicadorStats; // Escala velocidad
-                        nuevoEnemigo.radio = 16;
-                        nuevoEnemigo.emoji = '🧟';
-                        nuevoEnemigo.timerPatrulla = 0;
-                        nuevoEnemigo.vx = 0; nuevoEnemigo.vy = 0;
-                    } else if (dadoTipoEnemigo < 0.80) {
-                        nuevoEnemigo.tipo = 'kamikaze';
-                        nuevoEnemigo.hp = Math.floor(1 * multiplicadorStats);
-                        nuevoEnemigo.velocidad = 1.2 * multiplicadorStats;
-                        nuevoEnemigo.radio = 14;
-                        nuevoEnemigo.emoji = '🏃‍♂️';
-                    } else {
-                        nuevoEnemigo.tipo = 'lanzador';
-                        nuevoEnemigo.hp = Math.floor(2 * multiplicadorStats);
-                        nuevoEnemigo.velocidad = 0;
-                        nuevoEnemigo.radio = 16;
-                        nuevoEnemigo.emoji = '🧙‍♂️';
-                        // Disparan más rápido a mayor nivel
-                        nuevoEnemigo.cooldownBase = Math.max(40, 100 - (zona * 5)); 
-                        nuevoEnemigo.cooldownDisparo = 90; 
-                    }
-                    gameState.enemigos.push(nuevoEnemigo);
-                } else {
-                    gameState.arbustos.push({ x: cx, y: cy, radio: 22 });
-                }
-            }
+            
+            celdasLibres.push({
+                x: gX * CELL_SIZE + CELL_SIZE / 2, 
+                y: gY * CELL_SIZE + CELL_SIZE / 2
+            });
         }
     }
-    
+
+    // Mezclamos las celdas aleatoriamente
+    celdasLibres.sort(() => Math.random() - 0.5);
+
+    // Plantamos los cofres garantizados sacando celdas de la lista
+    for(let i = 0; i < cofresGarantizados; i++) {
+        if(celdasLibres.length > 0) {
+            let celda = celdasLibres.pop();
+            gameState.cofres.push({ x: celda.x, y: celda.y, radio: 18 });
+        }
+    }
+
+    // 3. GENERAR EL RESTO DEL MAPA (Enemigos y Arbustos)
+    celdasLibres.forEach(celda => {
+        if (Math.random() < densidadMundo) { 
+            let dadoGlobal = Math.random();
+            
+            // 40% Enemigo, 60% Arbusto
+            if (dadoGlobal < 0.40) {
+                let dadoTipoEnemigo = Math.random();
+                let nuevoEnemigo = { x: celda.x, y: celda.y, golpeadoEnEsteAtaque: false, pushbackFrames: 0, anguloPushback: 0 };
+                
+                // 🔥 CONTROL ESTRICTO DE TIPOS DE ENEMIGO POR ZONA
+                let probZombie = 1.0;
+                let probKamikaze = 0.0;
+                let probLanzador = 0.0;
+
+                if (zona === 1) {
+                    probZombie = 0.85; 
+                    probKamikaze = 0.15;
+                    probLanzador = 0.0; // Prohibido el lanzador en la Zona 1
+                } else if (zona === 2) {
+                    probZombie = 0.70; 
+                    probKamikaze = 0.30;
+                    probLanzador = 0.0; // Prohibido en Zona 2
+                } else { // Zona 3 en adelante
+                    probZombie = Math.max(0.40, 0.70 - (zona * 0.05)); // Los zombies bajan
+                    probKamikaze = 0.30; // Kamikazes se mantienen
+                    probLanzador = 1.0 - probZombie - probKamikaze; // El resto son Lanzadores
+                }
+
+                // Asignar el enemigo según la probabilidad de la zona
+                if (dadoTipoEnemigo < probZombie) {
+                    nuevoEnemigo.tipo = 'zombie';
+                    nuevoEnemigo.hp = Math.floor(3 * multiplicadorStats);
+                    nuevoEnemigo.velocidad = 0.5 * multiplicadorStats;
+                    nuevoEnemigo.radio = 16;
+                    nuevoEnemigo.emoji = '🧟';
+                    nuevoEnemigo.timerPatrulla = 0;
+                    nuevoEnemigo.vx = 0; nuevoEnemigo.vy = 0;
+                } else if (dadoTipoEnemigo < probZombie + probKamikaze) {
+                    nuevoEnemigo.tipo = 'kamikaze';
+                    nuevoEnemigo.hp = Math.floor(1 * multiplicadorStats);
+                    nuevoEnemigo.velocidad = 1.2 * multiplicadorStats;
+                    nuevoEnemigo.radio = 14;
+                    nuevoEnemigo.emoji = '🏃‍♂️';
+                } else {
+                    nuevoEnemigo.tipo = 'lanzador';
+                    nuevoEnemigo.hp = Math.floor(2 * multiplicadorStats);
+                    nuevoEnemigo.velocidad = 0;
+                    nuevoEnemigo.radio = 16;
+                    nuevoEnemigo.emoji = '🧙‍♂️';
+                    nuevoEnemigo.cooldownBase = Math.max(40, 100 - (zona * 5)); 
+                    nuevoEnemigo.cooldownDisparo = 90; 
+                }
+                gameState.enemigos.push(nuevoEnemigo);
+            } else {
+                gameState.arbustos.push({ x: celda.x, y: celda.y, radio: 22 });
+            }
+        }
+    });
+
     // Devolvemos al jugador al centro
     gameState.jugador.x = 450;
     gameState.jugador.y = 450;
     gameState.retrasoArranque = 90; 
 }
+
 
 function bucleJuego() {
     if (!gameState.corriendo) return;
