@@ -13,7 +13,9 @@ const GRID_SIZE = 8;
 const CELL_SIZE = 100; // 800x800 dividido en 8x8 significa celdas de 100x100
 
 const gameState = {
+    escenaActual: 'MENU',
     corriendo: false,
+    zonaActual: 1,
     teclas: { w: false, a: false, s: false, d: false },
     mouse: { x: 400, y: 400 },
     zonaActual: 1,

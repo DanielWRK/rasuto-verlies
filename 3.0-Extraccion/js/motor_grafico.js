@@ -123,25 +123,29 @@ function dibujarMotor() {
         ctx.textAlign = 'left'; // Resetear alineación
     }
 
-        // (Al final de dibujarMotor)
     // Dibujar el Portal de Descenso si está activo
     if (gameState.portalActivo) {
-        let pulso = Math.sin(Date.now() / 150) * 4; // Animación de latido
+        let pulso = Math.sin(Date.now() / 150) * 4;
+        let portalX = 400;
+        let portalY = (gameState.tipoPortal === 'ENTRADA_MAZMORRA') ? 150 : 400;
         
         ctx.beginPath();
-        ctx.arc(400, 400, 25 + pulso, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(156, 39, 176, 0.7)'; // Morado místico
+        ctx.arc(portalX, portalY, 25 + pulso, 0, Math.PI * 2);
+        // Si es el Lobby es Azul seguro, si es descenso es Morado místico
+        ctx.fillStyle = (gameState.tipoPortal === 'ENTRADA_MAZMORRA') ? 'rgba(33, 150, 243, 0.7)' : 'rgba(156, 39, 176, 0.7)'; 
         ctx.fill();
-        ctx.strokeStyle = '#E1BEE7';
+        ctx.strokeStyle = '#fff';
         ctx.lineWidth = 3;
         ctx.stroke();
 
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 12px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('DESCENDER', 400, 360);
+        let textoPortal = (gameState.tipoPortal === 'ENTRADA_MAZMORRA') ? 'ENTRAR A MAZMORRA' : 'DESCENDER';
+        ctx.fillText(textoPortal, portalX, portalY - 40);
         ctx.textAlign = 'left';
     }
+
 
     
 }

@@ -1,5 +1,74 @@
 /* =========================================
-   REQUERIMIENTO 3: GENERACIÓN PROCEDURAL CONTINUA
+   MÁQUINA DE ESTADOS (SCENE MANAGER)
+   ========================================= */
+function cambiarEscena(nuevaEscena) {
+    gameState.escenaActual = nuevaEscena;
+    
+    // 1. Ocultar TODAS las pantallas HTML
+    document.getElementById('pantalla-inicio').style.display = 'none';
+    document.getElementById('pantalla-pausa').style.display = 'none';
+    document.getElementById('pantalla-cofre').style.display = 'none';
+    document.getElementById('contenedor-juego').style.display = 'none';
+
+    // 2. Mostrar lo que corresponde
+    switch(nuevaEscena) {
+        case 'MENU':
+            document.getElementById('pantalla-inicio').style.display = 'block';
+            gameState.corriendo = false;
+            break;
+            
+        case 'LOBBY':
+            document.getElementById('contenedor-juego').style.display = 'block';
+            gameState.corriendo = true;
+            canvas.requestPointerLock();
+            break;
+            
+        case 'MAZMORRA':
+            document.getElementById('contenedor-juego').style.display = 'block';
+            gameState.corriendo = true;
+            canvas.requestPointerLock();
+            break;
+            
+        case 'PAUSA':
+            document.getElementById('pantalla-pausa').style.display = 'block';
+            document.getElementById('contenedor-juego').style.display = 'block'; // Fondo visible
+            gameState.corriendo = false;
+            document.exitPointerLock();
+            break;
+            
+        case 'COFRE': // 🔥 NUEVO ESTADO EXCLUSIVO PARA EL COFRE
+            document.getElementById('pantalla-cofre').style.display = 'flex';
+            document.getElementById('contenedor-juego').style.display = 'block'; // Fondo visible
+            gameState.corriendo = false;
+            document.exitPointerLock();
+            break;
+    }
+}
+
+
+/* =========================================
+   GENERACIÓN DEL LOBBY (ZONA SEGURA)
+   ========================================= */
+function generarLobby() {
+    // Vaciamos todo el peligro
+    gameState.enemigos = [];
+    gameState.cofres = [];
+    gameState.proyectilesEnemigos = [];
+    gameState.proyectilesJugador = [];
+    gameState.arbustos = [];
+    
+    // Ponemos al jugador en el centro
+    gameState.jugador.x = 400;
+    gameState.jugador.y = 400;
+    
+    // Forzamos un "portal" azul en la parte superior del mapa
+    gameState.portalActivo = true; 
+    gameState.tipoPortal = 'ENTRADA_MAZMORRA'; 
+}
+
+
+/* =========================================
+   GENERACIÓN PROCEDURAL CONTINUA
    ========================================= */
 
 function generarZona() {
@@ -82,16 +151,13 @@ function bucleJuego() {
    ========================================= */
 
 function abrirMenuCofre() {
-    gameState.corriendo = false;
-    document.exitPointerLock(); 
+    cambiarEscena('COFRE'); // 👈 Delega el trabajo a la Máquina de Estados
     
     const p = gameState.jugador;
     const contenedor = document.getElementById('contenedor-opciones');
     contenedor.innerHTML = ''; 
-
     let opcionesValidas = [];
 
-    // SI TIENE PUÑOS: Forzamos que salgan armas (y el escudo si no lo tiene)
     if (p.armaActual === 'punios') {
         // 🔥 CORRECCIÓN AQUÍ: Solo cambiamos el nombre del arma, el motor hace el resto
         opcionesValidas.push({ titulo: "⚔️ ESPADA DE BRONCE", desc: "Ataque de barrido (Rango medio)", ejec: () => { p.armaActual = 'espada'; } });
@@ -131,13 +197,11 @@ function abrirMenuCofre() {
         const carta = document.createElement('button');
         carta.className = 'carta-opcion';
         carta.innerHTML = `<div>${opcion.titulo}</div><div style="font-size:11px; margin-top:5px; color:#aaa;">${opcion.desc}</div>`;
+        
         carta.addEventListener('click', () => {
             opcion.ejec(); 
-            document.getElementById('pantalla-cofre').style.display = 'none';
-            canvas.requestPointerLock();
+            cambiarEscena('MAZMORRA'); // 👈 Regresamos a la acción
         });
         contenedor.appendChild(carta);
     });
-
-    document.getElementById('pantalla-cofre').style.display = 'flex';
 }

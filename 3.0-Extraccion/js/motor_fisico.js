@@ -266,16 +266,24 @@ function actualizarMotor() {
     
     gameState.enemigos = gameState.enemigos.filter(e => e.hp > 0);
 
-    // 🔥 LÓGICA DEL PORTAL
-    if (gameState.enemigos.length === 0 && gameState.retrasoArranque <= 0) {
+    // 🔥 LÓGICA DEL PORTAL ACTUALIZADA
+    if (gameState.escenaActual === 'MAZMORRA' && gameState.enemigos.length === 0 && gameState.retrasoArranque <= 0) {
         gameState.portalActivo = true;
-        // Si el jugador toca el centro del mapa (400, 400)
-        if (Math.hypot(p.x - 400, p.y - 400) < p.radio + 25) {
-            gameState.zonaActual++; // Subimos nivel
-            generarZona(); // Generamos el siguiente piso
-        }
-    } else {
-        gameState.portalActivo = false;
+        gameState.tipoPortal = 'DESCENSO';
     }
 
+        if (gameState.portalActivo) {
+        let portalX = 400;
+        let portalY = (gameState.tipoPortal === 'ENTRADA_MAZMORRA') ? 150 : 400;
+
+        if (Math.hypot(p.x - portalX, p.y - portalY) < p.radio + 25) {
+            if (gameState.tipoPortal === 'ENTRADA_MAZMORRA') {
+                generarZona(); // 👈 Se genera la Zona 1 aquí
+                cambiarEscena('MAZMORRA'); 
+            } else if (gameState.tipoPortal === 'DESCENSO') {
+                gameState.zonaActual++; 
+                generarZona(); // 👈 Se genera el piso siguiente aquí
+            }
+        }
+    }
 }
